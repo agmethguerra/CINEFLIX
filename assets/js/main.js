@@ -1,109 +1,236 @@
 /* ================================================================
-   CINEFLIX — main.js  |  Orquestación principal
+   CINEFLIX — main.js
+   Punto de entrada de la aplicación.
+   Orquesta las vistas, conecta el navbar y arranca todo.
    ================================================================ */
-import {
-  getTendencias, getPeliculasPopulares, getSeriesPopulares,
-  getPeliculasTopRated, getSeriesTopRated, getEnCartelera,
-  getPorGenero, getSeriesPorGenero,
-  getGenerosPeliculas, getGenerosSeries, buscar,
-  GENEROS_MAP,
-} from './api.js';
-import {
-  initHero, makeSeccion, buildSidebar,
-  buildGeneroChips, buildDropdownGeneros,
-  initBusqueda, mostrarCarga, mostrarError,
-} from './ui.js';
 
-const content = document.getElementById('mainContent');
-let generos   = [];
+import {
+  obtenerTendencias,
+  obtenerPeliculasPopulares,
+  obtenerSeriesPopulares,
+  obtenerPeliculasMejorValoradas,
+  obtenerSeriesMejorValoradas,
+  obtenerEnCartelera,
+  obtenerPeliculasPorGenero,
+  obtenerSeriesPorGenero,
+  obtenerGenerosPeliculas,
+  obtenerGenerosSeries,
+  buscarContenido,
+  MAPA_GENEROS,
+} from "./api.js";
 
-/* ── Inicio ──────────────────────────────────────────────── */
-async function renderInicio() {
-  mostrarCarga(content);
+import {
+  inicializarHero,
+  crearSeccion,
+  renderizarSidebar,
+  renderizarChipsDeGenero,
+  renderizarDropdownGeneros,
+  inicializarBuscador,
+  mostrarPantallaDeCarga,
+  mostrarPantallaDeError,
+} from "./ui.js";
+
+/* Contenedor principal donde se montan las secciones de cards */
+const contenedorPrincipal = document.getElementById("mainContent");
+
+/* Lista de géneros combinados (películas + series, sin repetidos) */
+let listaDeGeneros = [];
+
+/* ================================================================
+   VISTAS — cada función renderiza una pantalla completa
+   ================================================================ */
+
+/* Pantalla de inicio: tendencias, populares, cartelera */
+async function mostrarPantallaInicio() {
+  mostrarPantallaDeCarga(contenedorPrincipal);
   try {
-    const [tend, pops, sers, top, cart] = await Promise.all([
-      getTendencias(), getPeliculasPopulares(),
-      getSeriesPopulares(), getPeliculasTopRated(), getEnCartelera(),
+    const [
+      tendencias,
+      peliculasPopulares,
+      seriesPopulares,
+      peliculasMejorValoradas,
+      enCartelera,
+    ] = await Promise.all([
+      obtenerTendencias(),
+      obtenerPeliculasPopulares(),
+      obtenerSeriesPopulares(),
+      obtenerPeliculasMejorValoradas(),
+      obtenerEnCartelera(),
     ]);
-    initHero(tend.filter(m => m.backdrop));
-    content.innerHTML = '';
-    content.appendChild(makeSeccion('Top 10 en Tendencia',    tend.slice(0,10), 'top'));
-    content.appendChild(makeSeccion('Películas Populares',    pops));
-    content.appendChild(makeSeccion('Series Populares',       sers));
-    content.appendChild(makeSeccion('Las Mejor Valoradas',    top));
-    content.appendChild(makeSeccion('Ahora en Cines',         cart));
-    buildSidebar([...tend, ...pops, ...sers]);
-  } catch (e) {
-    console.error(e);
-    mostrarError(content, renderInicio);
+
+    /* Hero con las 6 tendencias más populares que tengan backdrop */
+    inicializarHero(tendencias.filter((c) => c.backdrop));
+
+    /* Montar las secciones de cards */
+    contenedorPrincipal.innerHTML = "";
+    contenedorPrincipal.appendChild(
+      crearSeccion("Top 10 en Tendencia", tendencias.slice(0, 10), "top"),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Películas Populares", peliculasPopulares),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Series Populares", seriesPopulares),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Las Mejor Valoradas", peliculasMejorValoradas),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Ahora en Cines", enCartelera),
+    );
+
+    /* Sidebar con los más populares de todas las categorías */
+    renderizarSidebar([
+      ...tendencias,
+      ...peliculasPopulares,
+      ...seriesPopulares,
+    ]);
+  } catch (error) {
+    console.error("Error cargando el inicio:", error);
+    mostrarPantallaDeError(contenedorPrincipal, mostrarPantallaInicio);
   }
 }
 
-async function renderPeliculas() {
-  mostrarCarga(content);
+/* Pantalla solo de películas */
+async function mostrarPantallaPeliculas() {
+  mostrarPantallaDeCarga(contenedorPrincipal);
   try {
-    const [pops, top, cart] = await Promise.all([
-      getPeliculasPopulares(), getPeliculasTopRated(), getEnCartelera(),
+    const [populares, mejorValoradas, enCartelera] = await Promise.all([
+      obtenerPeliculasPopulares(),
+      obtenerPeliculasMejorValoradas(),
+      obtenerEnCartelera(),
     ]);
-    content.innerHTML = '';
-    content.appendChild(makeSeccion('Películas Populares',  pops));
-    content.appendChild(makeSeccion('Mejor Valoradas',       top));
-    content.appendChild(makeSeccion('Ahora en Cines (MX)',   cart));
-  } catch (e) { mostrarError(content, renderPeliculas); }
+    contenedorPrincipal.innerHTML = "";
+    contenedorPrincipal.appendChild(
+      crearSeccion("Películas Populares", populares),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Mejor Valoradas", mejorValoradas),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Ahora en Cines (MX)", enCartelera),
+    );
+  } catch (error) {
+    mostrarPantallaDeError(contenedorPrincipal, mostrarPantallaPeliculas);
+  }
 }
 
-async function renderSeries() {
-  mostrarCarga(content);
+/* Pantalla solo de series */
+async function mostrarPantallaSeries() {
+  mostrarPantallaDeCarga(contenedorPrincipal);
   try {
-    const [pops, top] = await Promise.all([getSeriesPopulares(), getSeriesTopRated()]);
-    content.innerHTML = '';
-    content.appendChild(makeSeccion('Series Populares',         pops));
-    content.appendChild(makeSeccion('Series Mejor Valoradas',   top));
-  } catch (e) { mostrarError(content, renderSeries); }
+    const [populares, mejorValoradas] = await Promise.all([
+      obtenerSeriesPopulares(),
+      obtenerSeriesMejorValoradas(),
+    ]);
+    contenedorPrincipal.innerHTML = "";
+    contenedorPrincipal.appendChild(
+      crearSeccion("Series Populares", populares),
+    );
+    contenedorPrincipal.appendChild(
+      crearSeccion("Series Mejor Valoradas", mejorValoradas),
+    );
+  } catch (error) {
+    mostrarPantallaDeError(contenedorPrincipal, mostrarPantallaSeries);
+  }
 }
 
-async function renderGenero(genero) {
-  const nombre = genero.name || genero;
-  const id     = genero.id   || null;
-  if (!id) return;
-  mostrarCarga(content);
+/* Pantalla filtrada por género (películas + series del género) */
+async function mostrarPantallaDeGenero(genero) {
+  const nombreGenero = genero.name || genero;
+  const idGenero = genero.id || null;
+  if (!idGenero) return;
+
+  mostrarPantallaDeCarga(contenedorPrincipal);
   try {
-    const [peli, ser] = await Promise.all([getPorGenero(id), getSeriesPorGenero(id)]);
-    content.innerHTML = '';
-    if (peli.length) content.appendChild(makeSeccion(`${nombre} — Películas`, peli));
-    if (ser.length)  content.appendChild(makeSeccion(`${nombre} — Series`,    ser));
-    if (!peli.length && !ser.length)
-      content.innerHTML = `<p style="padding:2rem;font-family:var(--f-ui);color:var(--c-text-muted)">Sin resultados para "${nombre}".</p>`;
-    content.scrollIntoView({ behavior:'smooth', block:'start' });
-  } catch (e) { mostrarError(content, () => renderGenero(genero)); }
+    const [peliculas, series] = await Promise.all([
+      obtenerPeliculasPorGenero(idGenero),
+      obtenerSeriesPorGenero(idGenero),
+    ]);
+
+    contenedorPrincipal.innerHTML = "";
+
+    if (peliculas.length) {
+      contenedorPrincipal.appendChild(
+        crearSeccion(`${nombreGenero} — Películas`, peliculas),
+      );
+    }
+    if (series.length) {
+      contenedorPrincipal.appendChild(
+        crearSeccion(`${nombreGenero} — Series`, series),
+      );
+    }
+    if (!peliculas.length && !series.length) {
+      contenedorPrincipal.innerHTML = `
+        <p style="padding:2rem;font-family:var(--f-ui);color:var(--c-text-muted)">
+          Sin resultados para "${nombreGenero}".
+        </p>`;
+    }
+
+    contenedorPrincipal.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    mostrarPantallaDeError(contenedorPrincipal, () =>
+      mostrarPantallaDeGenero(genero),
+    );
+  }
 }
 
-/* ── Init ────────────────────────────────────────────────── */
-(async function init() {
-  /* Géneros en es-MX */
+/* ================================================================
+   INICIO DE LA APLICACIÓN
+   ================================================================ */
+(async function iniciarAplicacion() {
+  /* Cargar géneros en es-MX para el dropdown y los chips del sidebar */
   try {
-    const [gP, gS] = await Promise.all([getGenerosPeliculas(), getGenerosSeries()]);
-    const seen = new Set();
-    generos = [...gP, ...gS].filter(g => {
-      if (seen.has(g.id)) return false;
-      seen.add(g.id); return true;
-    });
+    const [generosDePeliculas, generosDeSeries] = await Promise.all([
+      obtenerGenerosPeliculas(),
+      obtenerGenerosSeries(),
+    ]);
+
+    /* Combinar géneros de películas y series eliminando duplicados por ID */
+    const idYaAgregados = new Set();
+    listaDeGeneros = [...generosDePeliculas, ...generosDeSeries].filter(
+      (genero) => {
+        if (idYaAgregados.has(genero.id)) return false;
+        idYaAgregados.add(genero.id);
+        return true;
+      },
+    );
   } catch (_) {
-    generos = Object.entries(GENEROS_MAP).map(([id,name]) => ({id:+id, name}));
+    /* Si TMDB falla, usar el mapa estático como fallback */
+    listaDeGeneros = Object.entries(MAPA_GENEROS).map(([id, nombre]) => ({
+      id: Number(id),
+      name: nombre,
+    }));
   }
 
-  buildDropdownGeneros(generos, renderGenero);
-  buildGeneroChips(generos, renderGenero);
-  initBusqueda(buscar);
+  /* Montar géneros en el dropdown del navbar y en los chips del sidebar */
+  renderizarDropdownGeneros(listaDeGeneros, mostrarPantallaDeGenero);
+  renderizarChipsDeGenero(listaDeGeneros, mostrarPantallaDeGenero);
 
-  /* Navbar */
-  ['navInicio','navInicio2'].forEach(id => {
-    document.getElementById(id)?.addEventListener('click', e => {
-      e.preventDefault(); window.scrollTo({top:0,behavior:'smooth'}); renderInicio();
+  /* Inicializar el buscador con la función de búsqueda de la API */
+  inicializarBuscador(buscarContenido);
+
+  /* Conectar los enlaces del navbar */
+  ["navInicio", "navInicio2"].forEach((idElemento) => {
+    document.getElementById(idElemento)?.addEventListener("click", (evento) => {
+      evento.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      mostrarPantallaInicio();
     });
   });
-  document.getElementById('navPeliculas')?.addEventListener('click', e => { e.preventDefault(); renderPeliculas(); });
-  document.getElementById('navSeries')?.addEventListener('click',    e => { e.preventDefault(); renderSeries(); });
 
-  await renderInicio();
+  document
+    .getElementById("navPeliculas")
+    ?.addEventListener("click", (evento) => {
+      evento.preventDefault();
+      mostrarPantallaPeliculas();
+    });
+
+  document.getElementById("navSeries")?.addEventListener("click", (evento) => {
+    evento.preventDefault();
+    mostrarPantallaSeries();
+  });
+
+  /* Renderizar la pantalla de inicio al arrancar */
+  await mostrarPantallaInicio();
 })();

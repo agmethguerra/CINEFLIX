@@ -1,192 +1,209 @@
 /* ================================================================
    CINEFLIX — player.js
-   
-   Arquitectura:
-   1. TMDB API  → metadatos (título, póster, sinopsis) en es-MX
-   2. vidsrc.cc → stream via embed (más estable, 5+ años operando)
-   3. JW Player (open-source CC) → controles, skin carmesí CineFlix
-   
-   JW Player open-source se carga desde CDN y recibe el stream
-   via postMessage desde vidsrc.cc. El player se inicializa con
-   una imagen de póster y al recibir el stream lo reproduce.
-   
-   Fuentes ordenadas por estabilidad histórica:
-   1. vidsrc.cc  (5+ años, API estable con TMDB ID)
-   2. vidsrc.me  (más antigua, gran base de datos)
-   3. 2embed.cc  (respaldo confiable)
-   4. embed.su   (respaldo adicional)
+   Controla el modal del reproductor.
    ================================================================ */
 
-import { getDetallePelicula, getDetalleSerie } from './api.js';
+import { obtenerDetallePelicula, obtenerDetalleSerie } from "./api.js";
 
-/* ── DOM ──────────────────────────────────────────────────── */
-const overlay    = document.getElementById('playerOverlay');
-const sourceBar  = document.getElementById('sourceBar');
-const jwWrap     = document.getElementById('cf-jwplayer-wrap');
-const spinner    = document.getElementById('cfSpinner');
-const errorBox   = document.getElementById('cfPlayerError');
-const infoTitulo = document.getElementById('infoTitulo');
-const infoMeta   = document.getElementById('infoMeta');
-const infoNota   = document.getElementById('infoNota');
-const infoSinop  = document.getElementById('infoSinopsis');
-const btnCerrar  = document.getElementById('playerCerrar');
+/* ── Referencias al DOM del modal ─────────────────────────── */
+const modalOverlay = document.getElementById("playerOverlay");
+const barraDeServidores = document.getElementById("sourceBar");
+const contenedorDelPlayer = document.getElementById("cf-jwplayer-wrap");
+const spinnerDeCarga = document.getElementById("cfSpinner");
+const mensajeDeError = document.getElementById("cfPlayerError");
+const tituloEnModal = document.getElementById("infoTitulo");
+const metadatosEnModal = document.getElementById("infoMeta");
+const notaEnModal = document.getElementById("infoNota");
+const sinopsisEnModal = document.getElementById("infoSinopsis");
+const botonCerrarModal = document.getElementById("playerCerrar");
 
-let playerInstance = null;
-let iframeEl       = null;
-let activeItem     = null;
+/* ── Estado interno del reproductor ───────────────────────── */
+let iframeActual = null; // iframe del stream activo
+let contenidoActual = null; // objeto película/serie que se está reproduciendo
 
-/* ================================================================
-   FUENTES — ordenadas por estabilidad
-   vidsrc.cc soporta: color personalizado, TMDB ID directo,
-   postMessage events, sin registro requerido
-   ================================================================ */
-function getFuentes(item) {
-  const id   = item.tmdb;
-  const tipo = item.tipo === 'tv' ? 'tv' : 'movie';
-  const clr  = '9b111e';
+/* Color carmesí de la marca para personalizar los embeds */
+const COLOR_MARCA = "9b111e";
+
+/* ── Construye la lista de servidores para un contenido ────── */
+function construirListaDeServidores(contenido) {
+  const idTMDB = contenido.tmdb;
+  const tipoMedia = contenido.tipo === "tv" ? "tv" : "movie";
 
   return [
     {
-      nombre: 'Servidor 1',
-      /* vidsrc.cc: el más estable y con mejor soporte de API */
-      url: `https://vidsrc.cc/v2/embed/${tipo}/${id}?autoPlay=true&color=${clr}`,
+      nombre: "Servidor 1",
+      url: `https://vidsrc.cc/v2/embed/${tipoMedia}/${idTMDB}?autoPlay=true&color=${COLOR_MARCA}`,
     },
     {
-      nombre: 'Servidor 2',
-      /* vidsrc.me: lleva 5+ años, base de datos masiva */
-      url: `https://vidsrc.me/embed/${tipo}?tmdb=${id}`,
+      nombre: "Servidor 2",
+      url: `https://vidsrc.me/embed/${tipoMedia}?tmdb=${idTMDB}`,
     },
     {
-      nombre: 'Servidor 3',
-      /* 2embed.cc: respaldo confiable */
-      url: tipo === 'movie'
-        ? `https://www.2embed.cc/embed/${id}`
-        : `https://www.2embed.cc/embedtv/${id}`,
+      nombre: "Servidor 3",
+      url:
+        tipoMedia === "movie"
+          ? `https://www.2embed.cc/embed/${idTMDB}`
+          : `https://www.2embed.cc/embedtv/${idTMDB}`,
     },
     {
-      nombre: 'Servidor 4',
-      /* embed.su: respaldo adicional */
-      url: `https://embed.su/embed/${tipo}/${id}`,
+      nombre: "Servidor 4",
+      url: `https://embed.su/embed/${tipoMedia}/${idTMDB}`,
     },
   ];
 }
 
-/* ── Abrir modal ─────────────────────────────────────────── */
-export async function abrirPlayer(item) {
-  activeItem = { ...item };
-  overlay.classList.add('is-open');
-  document.body.style.overflow = 'hidden';
+/* ── Abre el modal y empieza la reproducción ───────────────── */
+export async function abrirReproductor(contenido) {
+  contenidoActual = { ...contenido };
 
-  pintarInfo(activeItem);
-  mostrarSpinner(true);
-  ocultarError();
+  /* Mostrar modal */
+  modalOverlay.classList.add("is-open");
+  document.body.style.overflow = "hidden";
 
-  const fuentes = getFuentes(activeItem);
-  pintarSourceBar(fuentes);
-  cargarFuente(fuentes[0]);
+  /* Pintar info básica y arrancar el primer servidor */
+  actualizarInfoEnModal(contenidoActual);
+  activarSpinner(true);
+  ocultarMensajeDeError();
 
-  /* Obtener detalle completo (IMDB, duración real) en background */
+  const servidores = construirListaDeServidores(contenidoActual);
+  renderizarBarraDeServidores(servidores);
+  cargarServidor(servidores[0]);
+
+  /* Pedir el detalle completo en segundo plano para obtener
+     duración real, IMDB ID y géneros completos */
   try {
-    const d = activeItem.tipo === 'tv'
-      ? await getDetalleSerie(activeItem.tmdb)
-      : await getDetallePelicula(activeItem.tmdb);
-    Object.assign(activeItem, d);
-    pintarInfo(activeItem);
-  } catch (_) { /* fallo silencioso */ }
+    const detalle =
+      contenidoActual.tipo === "tv"
+        ? await obtenerDetalleSerie(contenidoActual.tmdb)
+        : await obtenerDetallePelicula(contenidoActual.tmdb);
+
+    Object.assign(contenidoActual, detalle);
+    actualizarInfoEnModal(contenidoActual);
+  } catch (_) {
+    /* Si el detalle falla, la info básica ya está pintada — no pasa nada */
+  }
 }
 
-/* ── Pintar info ────────────────────────────────────────── */
-function pintarInfo(item) {
-  infoTitulo.textContent  = item.titulo  || '–';
-  infoNota.textContent    = item.nota    ? `★ ${item.nota}` : '';
-  infoSinop.textContent   = item.sinopsis || '';
-  infoMeta.innerHTML = [
-    item.anio     && `<span class="chip">${item.anio}</span>`,
-    item.duracion && `<span class="chip">${item.duracion}</span>`,
-    item.tipo === 'tv' && `<span class="chip">Serie</span>`,
-    ...(item.generos || []).slice(0, 4).map(g => `<span class="chip">${g}</span>`),
-  ].filter(Boolean).join('');
+/* ── Escribe la info del contenido en el modal ─────────────── */
+function actualizarInfoEnModal(contenido) {
+  tituloEnModal.textContent = contenido.titulo || "–";
+  notaEnModal.textContent = contenido.nota ? `★ ${contenido.nota}` : "";
+  sinopsisEnModal.textContent = contenido.sinopsis || "";
+
+  const chipsDeMetadatos = [
+    contenido.anio && `<span class="chip">${contenido.anio}</span>`,
+    contenido.duracion && `<span class="chip">${contenido.duracion}</span>`,
+    contenido.tipo === "tv" && `<span class="chip">Serie</span>`,
+    ...(contenido.generos || [])
+      .slice(0, 4)
+      .map((genero) => `<span class="chip">${genero}</span>`),
+  ]
+    .filter(Boolean)
+    .join("");
+
+  metadatosEnModal.innerHTML = chipsDeMetadatos;
 }
 
-/* ── Source bar ─────────────────────────────────────────── */
-function pintarSourceBar(fuentes) {
-  sourceBar.innerHTML = '<span class="cf-source-label"><i class="bi bi-broadcast"></i> Servidor:</span>';
-  fuentes.forEach((f, i) => {
-    const btn = document.createElement('button');
-    btn.className   = 'cf-source-btn' + (i === 0 ? ' is-active' : '');
-    btn.textContent = f.nombre;
-    btn.addEventListener('click', () => {
-      sourceBar.querySelectorAll('.cf-source-btn').forEach(b => b.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      ocultarError();
-      mostrarSpinner(true);
-      cargarFuente(f);
+/* ── Dibuja los botones de selección de servidor ───────────── */
+function renderizarBarraDeServidores(servidores) {
+  barraDeServidores.innerHTML =
+    '<span class="cf-source-label"><i class="bi bi-broadcast"></i> Servidor:</span>';
+
+  servidores.forEach((servidor, indice) => {
+    const boton = document.createElement("button");
+    boton.className = "cf-source-btn" + (indice === 0 ? " is-active" : "");
+    boton.textContent = servidor.nombre;
+
+    boton.addEventListener("click", () => {
+      barraDeServidores
+        .querySelectorAll(".cf-source-btn")
+        .forEach((btn) => btn.classList.remove("is-active"));
+      boton.classList.add("is-active");
+      ocultarMensajeDeError();
+      activarSpinner(true);
+      cargarServidor(servidor);
     });
-    sourceBar.appendChild(btn);
+
+    barraDeServidores.appendChild(boton);
   });
 }
 
-/* ── Cargar fuente via iframe ───────────────────────────── */
-function cargarFuente(fuente) {
-  /* Destruir iframe anterior */
-  if (iframeEl) { iframeEl.remove(); iframeEl = null; }
-  if (playerInstance) {
-    try { playerInstance.remove(); } catch (_) {}
-    playerInstance = null;
+/* ── Carga un servidor en el iframe ────────────────────────── */
+function cargarServidor(servidor) {
+  /* Eliminar el iframe anterior para cortar el stream previo */
+  if (iframeActual) {
+    iframeActual.remove();
+    iframeActual = null;
   }
 
-  /* Crear iframe del proveedor de stream */
-  iframeEl = document.createElement('iframe');
-  iframeEl.src = fuente.url;
-  iframeEl.allowFullscreen = true;
-  iframeEl.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
-  iframeEl.setAttribute('referrerpolicy', 'no-referrer');
-  iframeEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:none;z-index:1;';
+  /* Crear el iframe con la URL del servidor */
+  iframeActual = document.createElement("iframe");
+  iframeActual.src = servidor.url;
+  iframeActual.allowFullscreen = true;
+  iframeActual.setAttribute(
+    "allow",
+    "autoplay; encrypted-media; fullscreen; picture-in-picture",
+  );
+  iframeActual.setAttribute("referrerpolicy", "no-referrer");
+  iframeActual.style.cssText =
+    "position:absolute;inset:0;width:100%;height:100%;border:none;z-index:1;";
 
-  /* Spinner oculto cuando el iframe carga */
-  iframeEl.addEventListener('load', () => mostrarSpinner(false), { once: true });
+  /* Ocultar spinner cuando el iframe termina de cargar */
+  iframeActual.addEventListener("load", () => activarSpinner(false), {
+    once: true,
+  });
 
-  /* Timeout de error si no carga en 15s */
-  const timeout = setTimeout(() => {
-    if (spinner.style.display !== 'none') {
-      mostrarSpinner(false);
-      mostrarError();
+  /* Si el iframe no carga en 15 segundos, mostrar error */
+  const temporizadorDeError = setTimeout(() => {
+    if (spinnerDeCarga.style.display !== "none") {
+      activarSpinner(false);
+      mostrarMensajeDeError();
     }
   }, 15000);
 
-  iframeEl.addEventListener('load', () => clearTimeout(timeout), { once: true });
+  iframeActual.addEventListener(
+    "load",
+    () => clearTimeout(temporizadorDeError),
+    { once: true },
+  );
 
-  jwWrap.appendChild(iframeEl);
+  contenedorDelPlayer.appendChild(iframeActual);
 }
 
-/* ── Helpers UI ─────────────────────────────────────────── */
-function mostrarSpinner(v) {
-  spinner.style.display = v ? 'flex' : 'none';
-}
-function mostrarError() {
-  errorBox.classList.add('is-show');
-}
-function ocultarError() {
-  errorBox.classList.remove('is-show');
+/* ── Muestra u oculta el spinner de carga ──────────────────── */
+function activarSpinner(mostrar) {
+  spinnerDeCarga.style.display = mostrar ? "flex" : "none";
 }
 
-/* ── Cerrar ─────────────────────────────────────────────── */
-function cerrar() {
-  overlay.classList.remove('is-open');
-  document.body.style.overflow = '';
+function mostrarMensajeDeError() {
+  mensajeDeError.classList.add("is-show");
+}
 
-  /* Destruir iframe → detiene reproducción inmediatamente */
-  if (iframeEl) { iframeEl.remove(); iframeEl = null; }
-  if (playerInstance) {
-    try { playerInstance.remove(); } catch (_) {}
-    playerInstance = null;
+function ocultarMensajeDeError() {
+  mensajeDeError.classList.remove("is-show");
+}
+
+/* ── Cierra el modal y detiene la reproducción ─────────────── */
+function cerrarReproductor() {
+  modalOverlay.classList.remove("is-open");
+  document.body.style.overflow = "";
+
+  /* Eliminar el iframe detiene el stream inmediatamente */
+  if (iframeActual) {
+    iframeActual.remove();
+    iframeActual = null;
   }
 
-  mostrarSpinner(false);
-  ocultarError();
-  activeItem = null;
+  activarSpinner(false);
+  ocultarMensajeDeError();
+  contenidoActual = null;
 }
 
-btnCerrar.addEventListener('click', cerrar);
-overlay.addEventListener('click', e => { if (e.target === overlay) cerrar(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrar(); });
+/* ── Eventos para cerrar el modal ──────────────────────────── */
+botonCerrarModal.addEventListener("click", cerrarReproductor);
+modalOverlay.addEventListener("click", (evento) => {
+  if (evento.target === modalOverlay) cerrarReproductor();
+});
+document.addEventListener("keydown", (evento) => {
+  if (evento.key === "Escape") cerrarReproductor();
+});

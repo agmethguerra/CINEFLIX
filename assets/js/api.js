@@ -1,76 +1,220 @@
 /* ================================================================
    CINEFLIX — api.js
-   TMDB v3 · language=es-MX · region=MX — fijados, sin exposición
+   Comunicación con la API de TMDB.
+   Idioma fijo: es-MX (español latino). Región fija: MX. - No funciona - por defecto esta en ingles.
    ================================================================ */
-const _K = '8265bd1679663a7ea12ac168da84d2e8';
-const _B = 'https://api.themoviedb.org/3';
-const _L = 'es-MX';
-const _R = 'MX';
 
-export const IMG = {
-  poster: 'https://image.tmdb.org/t/p/w342',
-  back:   'https://image.tmdb.org/t/p/w1280',
+const TMDB_API_KEY = "8265bd1679663a7ea12ac168da84d2e8";
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const TMDB_LANGUAGE = "es-MX";
+const TMDB_REGION = "MX";
+
+/* Prefijos de URL para imágenes de TMDB */
+export const TMDB_IMG = {
+  poster: "https://image.tmdb.org/t/p/w342",
+  backdrop: "https://image.tmdb.org/t/p/w1280",
 };
 
-export const GENEROS_MAP = {
-  28:'Acción',12:'Aventura',16:'Animación',35:'Comedia',80:'Crimen',
-  99:'Documental',18:'Drama',10751:'Familia',14:'Fantasía',36:'Historia',
-  27:'Terror',10402:'Musical',9648:'Misterio',10749:'Romance',
-  878:'Ciencia Ficción',53:'Suspenso',10752:'Bélica',37:'Western',
-  10759:'Acción & Aventura',10765:'Sci-Fi & Fantasía',10766:'Telenovela',
+/* Mapa de ID de género TMDB → nombre en español */
+export const MAPA_GENEROS = {
+  28: "Acción",
+  12: "Aventura",
+  16: "Animación",
+  35: "Comedia",
+  80: "Crimen",
+  99: "Documental",
+  18: "Drama",
+  10751: "Familia",
+  14: "Fantasía",
+  36: "Historia",
+  27: "Terror",
+  10402: "Musical",
+  9648: "Misterio",
+  10749: "Romance",
+  878: "Ciencia Ficción",
+  53: "Suspenso",
+  10752: "Bélica",
+  37: "Western",
+  10759: "Acción & Aventura",
+  10765: "Sci-Fi & Fantasía",
+  10766: "Telenovela",
 };
 
-async function _get(path, extra = {}) {
-  const p = new URLSearchParams({ api_key:_K, language:'es-MX', region:'MX', ...extra });
-  const r = await fetch(`${_B}${path}?${p}`);
-  if (!r.ok) throw new Error(`TMDB ${r.status}`);
-  return r.json();
+/* ── Petición HTTP a TMDB ──────────────────────────────────── */
+async function peticionTMDB(endpoint, parametrosExtra = {}) {
+  const parametros = new URLSearchParams({
+    api_key: TMDB_API_KEY,
+    language: TMDB_LANGUAGE,
+    region: TMDB_REGION,
+    ...parametrosExtra,
+  });
+  const respuesta = await fetch(`${TMDB_BASE_URL}${endpoint}?${parametros}`);
+  if (!respuesta.ok) throw new Error(`TMDB error ${respuesta.status}`);
+  return respuesta.json();
 }
 
-function _norm(item, tipo) {
-  const esP = tipo === 'movie';
+/* ── Convierte un resultado crudo de TMDB a objeto CineFlix ── */
+function normalizarResultado(resultadoCrudo, tipo) {
+  const esPelicula = tipo === "movie";
   return {
-    tmdb:    item.id,
-    imdb:    item.imdb_id || null,
+    tmdb: resultadoCrudo.id,
+    imdb: resultadoCrudo.imdb_id || null,
     tipo,
-    titulo:  esP ? (item.title||item.original_title) : (item.name||item.original_name),
-    anio:    parseInt((esP ? item.release_date : item.first_air_date)||'0'),
-    nota:    Math.round(item.vote_average * 10) / 10,
-    sinopsis:item.overview || 'Sin descripción disponible.',
-    poster:  item.poster_path   ? IMG.poster + item.poster_path   : null,
-    backdrop:item.backdrop_path ? IMG.back   + item.backdrop_path : null,
-    generos: (item.genre_ids||[]).map(id => GENEROS_MAP[id]).filter(Boolean),
-    popularidad: item.popularity || 0,
+    titulo: esPelicula
+      ? resultadoCrudo.title || resultadoCrudo.original_title
+      : resultadoCrudo.name || resultadoCrudo.original_name,
+    anio: parseInt(
+      (esPelicula
+        ? resultadoCrudo.release_date
+        : resultadoCrudo.first_air_date) || "0",
+    ),
+    nota: Math.round(resultadoCrudo.vote_average * 10) / 10,
+    sinopsis: resultadoCrudo.overview || "Sin descripción disponible.",
+    poster: resultadoCrudo.poster_path
+      ? TMDB_IMG.poster + resultadoCrudo.poster_path
+      : null,
+    backdrop: resultadoCrudo.backdrop_path
+      ? TMDB_IMG.backdrop + resultadoCrudo.backdrop_path
+      : null,
+    generos: (resultadoCrudo.genre_ids || [])
+      .map((idGenero) => MAPA_GENEROS[idGenero])
+      .filter(Boolean),
+    popularidad: resultadoCrudo.popularity || 0,
     duracion: null,
   };
 }
 
-function _normFull(item, tipo) {
-  const base = _norm({...item, genre_ids:(item.genres||[]).map(g=>g.id)}, tipo);
-  base.generos  = (item.genres||[]).map(g => g.name);
-  base.imdb     = item.imdb_id || item.external_ids?.imdb_id || null;
-  base.duracion = tipo === 'movie'
-    ? (item.runtime ? `${Math.floor(item.runtime/60)}h ${item.runtime%60}m` : null)
-    : (item.number_of_seasons ? `${item.number_of_seasons} Temporada${item.number_of_seasons>1?'s':''}` : null);
+/* ── Convierte el detalle completo de TMDB (incluye duración e IMDB ID) */
+function normalizarDetalle(detalleCrudo, tipo) {
+  const base = normalizarResultado(
+    {
+      ...detalleCrudo,
+      genre_ids: (detalleCrudo.genres || []).map((g) => g.id),
+    },
+    tipo,
+  );
+  base.generos = (detalleCrudo.genres || []).map((g) => g.name);
+  base.imdb =
+    detalleCrudo.imdb_id || detalleCrudo.external_ids?.imdb_id || null;
+  base.duracion =
+    tipo === "movie"
+      ? detalleCrudo.runtime
+        ? `${Math.floor(detalleCrudo.runtime / 60)}h ${detalleCrudo.runtime % 60}m`
+        : null
+      : detalleCrudo.number_of_seasons
+        ? `${detalleCrudo.number_of_seasons} Temporada${detalleCrudo.number_of_seasons > 1 ? "s" : ""}`
+        : null;
   return base;
 }
 
-export const getTendencias         = ()      => _get('/trending/all/week').then(d => d.results.map(m => _norm(m, m.media_type==='tv'?'tv':'movie')));
-export const getPeliculasPopulares = (p=1)   => _get('/movie/popular',   {page:p}).then(d => d.results.map(m => _norm(m,'movie')));
-export const getSeriesPopulares    = (p=1)   => _get('/tv/popular',      {page:p}).then(d => d.results.map(m => _norm(m,'tv')));
-export const getPeliculasTopRated  = (p=1)   => _get('/movie/top_rated', {page:p}).then(d => d.results.map(m => _norm(m,'movie')));
-export const getSeriesTopRated     = (p=1)   => _get('/tv/top_rated',    {page:p}).then(d => d.results.map(m => _norm(m,'tv')));
-export const getEnCartelera        = (p=1)   => _get('/movie/now_playing',{page:p}).then(d => d.results.map(m => _norm(m,'movie')));
-export const getPorGenero          = (id,p=1)=> _get('/discover/movie',  {with_genres:id, sort_by:'popularity.desc', page:p}).then(d => d.results.map(m => _norm(m,'movie')));
-export const getSeriesPorGenero    = (id,p=1)=> _get('/discover/tv',     {with_genres:id, sort_by:'popularity.desc', page:p}).then(d => d.results.map(m => _norm(m,'tv')));
-export const getGenerosPeliculas   = ()      => _get('/genre/movie/list').then(d => d.genres);
-export const getGenerosSeries      = ()      => _get('/genre/tv/list').then(d => d.genres);
-export const buscar                = (q)     => {
-  if (!q||q.trim().length<2) return Promise.resolve([]);
-  return _get('/search/multi',{query:q.trim()}).then(d =>
-    d.results.filter(m => m.media_type!=='person' && (m.poster_path||m.backdrop_path))
-             .map(m => _norm(m, m.media_type==='tv'?'tv':'movie'))
+/* ================================================================
+   Funciones públicas
+   ================================================================ */
+
+/** Tendencias de la semana (mezcla de películas y series) */
+export function obtenerTendencias() {
+  return peticionTMDB("/trending/all/week").then((datos) =>
+    datos.results.map((item) =>
+      normalizarResultado(item, item.media_type === "tv" ? "tv" : "movie"),
+    ),
   );
-};
-export const getDetallePelicula = (id) => _get(`/movie/${id}`, {append_to_response:'external_ids'}).then(d => _normFull(d,'movie'));
-export const getDetalleSerie    = (id) => _get(`/tv/${id}`,    {append_to_response:'external_ids'}).then(d => _normFull(d,'tv'));
+}
+
+/** Películas más populares en México */
+export function obtenerPeliculasPopulares(pagina = 1) {
+  return peticionTMDB("/movie/popular", { page: pagina }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "movie")),
+  );
+}
+
+/** Series más populares en México */
+export function obtenerSeriesPopulares(pagina = 1) {
+  return peticionTMDB("/tv/popular", { page: pagina }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "tv")),
+  );
+}
+
+/** Películas mejor valoradas */
+export function obtenerPeliculasMejorValoradas(pagina = 1) {
+  return peticionTMDB("/movie/top_rated", { page: pagina }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "movie")),
+  );
+}
+
+/** Series mejor valoradas */
+export function obtenerSeriesMejorValoradas(pagina = 1) {
+  return peticionTMDB("/tv/top_rated", { page: pagina }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "tv")),
+  );
+}
+
+/** Películas actualmente en cartelera en México */
+export function obtenerEnCartelera(pagina = 1) {
+  return peticionTMDB("/movie/now_playing", { page: pagina }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "movie")),
+  );
+}
+
+/** Películas filtradas por ID de género */
+export function obtenerPeliculasPorGenero(idGenero, pagina = 1) {
+  return peticionTMDB("/discover/movie", {
+    with_genres: idGenero,
+    sort_by: "popularity.desc",
+    page: pagina,
+  }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "movie")),
+  );
+}
+
+/** Series filtradas por ID de género */
+export function obtenerSeriesPorGenero(idGenero, pagina = 1) {
+  return peticionTMDB("/discover/tv", {
+    with_genres: idGenero,
+    sort_by: "popularity.desc",
+    page: pagina,
+  }).then((datos) =>
+    datos.results.map((item) => normalizarResultado(item, "tv")),
+  );
+}
+
+/** Lista de géneros de películas en español */
+export function obtenerGenerosPeliculas() {
+  return peticionTMDB("/genre/movie/list").then((datos) => datos.genres);
+}
+
+/** Lista de géneros de series en español */
+export function obtenerGenerosSeries() {
+  return peticionTMDB("/genre/tv/list").then((datos) => datos.genres);
+}
+
+/** Detalle completo de una película (incluye duración e IMDB ID) */
+export function obtenerDetallePelicula(idTMDB) {
+  return peticionTMDB(`/movie/${idTMDB}`, {
+    append_to_response: "external_ids",
+  }).then((datos) => normalizarDetalle(datos, "movie"));
+}
+
+/** Detalle completo de una serie (incluye temporadas e IMDB ID) */
+export function obtenerDetalleSerie(idTMDB) {
+  return peticionTMDB(`/tv/${idTMDB}`, {
+    append_to_response: "external_ids",
+  }).then((datos) => normalizarDetalle(datos, "tv"));
+}
+
+/** Búsqueda de películas y series por texto */
+export function buscarContenido(textoBusqueda) {
+  if (!textoBusqueda || textoBusqueda.trim().length < 2)
+    return Promise.resolve([]);
+  return peticionTMDB("/search/multi", { query: textoBusqueda.trim() }).then(
+    (datos) =>
+      datos.results
+        .filter(
+          (item) =>
+            item.media_type !== "person" &&
+            (item.poster_path || item.backdrop_path),
+        )
+        .map((item) =>
+          normalizarResultado(item, item.media_type === "tv" ? "tv" : "movie"),
+        ),
+  );
+}
