@@ -4,22 +4,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="CineFlix — Películas y series en español latino." />
-  <title>CinesFlix</title>
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg"/>
-  <!-- Fuentes -->
+  <!-- SEO BÁSICO -->
+  <title>Cinesflix</title>
+  <meta name="description"
+    content="cinesflix: ve películas y series en español latino completamente gratis. Catálogo actualizado con las tendencias, estrenos y los títulos mejor valorados." />
+  <meta name="keywords"
+    content="películas online, series online, español latino, ver películas gratis, estrenos, catálogo películas, cinesflix" />
+  <meta name="author" content="cinesflix" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://cinesflix.netlify.app/" />
+
+  <!-- OPEN GRAPH (Facebook, WhatsApp, LinkedIn) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="CinesFlix" />
+  <meta property="og:title" content="CinesFlix — Películas y Series en Español Latino" />
+  <meta property="og:description"
+    content="Ve películas y series en español latino gratis. Catálogo actualizado con tendencias, estrenos y títulos mejor valorados." />
+  <meta property="og:url" content="https://cinesflix.netlify.app/" />
+  <meta property="og:image" content="https://cinesflix.netlify.app/og-image.jpg" />
+  <meta property="og:locale" content="es_MX" />
+
+  <!-- TWITTER CARD -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="CinesFlix — Películas y Series en Español Latino" />
+  <meta name="twitter:description"
+    content="Ve películas y series en español latino gratis. Tendencias, estrenos y los mejor valorados." />
+  <meta name="twitter:image" content="https://cinesflix.netlify.app/og-image.jpg" />
+
+  <!-- SCHEMA.ORG (datos estructurados para Google)-->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "CinesFlix",
+    "url": "https://cinesflix.netlify.app/",
+    "description": "Plataforma de películas y series en español latino.",
+    "inLanguage": "es-MX",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://cinesflix.netlify.app/?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+
+  <!-- FAVICON -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="shortcut icon" href="favicon.svg" />
+
+  <!-- FUENTES -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@300;400;600;700&family=Barlow:wght@300;400;500&display=swap"
     rel="stylesheet" />
 
+  <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
+  <!-- JW Player -->
   <script src="https://cdn.jwplayer.com/libraries/IDzF9Zmk.js"></script>
 
+  <!-- Estilos -->
   <link rel="stylesheet" href="assets/css/variables.css" />
   <link rel="stylesheet" href="assets/css/base.css" />
   <link rel="stylesheet" href="assets/css/navbar.css" />
