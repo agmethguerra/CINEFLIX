@@ -304,18 +304,52 @@
     border-bottom: none;
   }
 }
-@media (max-width: 640px) {
+
+@media (max-width: 768px) {
   .cf-hero {
-    height: 58vh;
-    min-height: 340px;
+    height: 62vh;
+    min-height: 360px;
+  }
+  .cf-hero-content {
+    padding: 0 1.25rem 1.5rem;
+  }
+  .cf-hero-desc {
+    display: none;
+  }
+  .cf-row-head {
+    padding: 0 1.25rem;
+  }
+  .cf-row {
+    padding: 0.25rem 1.25rem 0.75rem;
+  }
+}
+
+@media (max-width: 540px) {
+  .cf-hero {
+    height: 55vh;
+    min-height: 300px;
   }
   .cf-hero-content {
     padding: 0 1rem 1.25rem;
   }
-  .cf-row-head,
+  .cf-hero-title {
+    font-size: 2rem;
+  }
+  .cf-hero-meta {
+    font-size: 0.78rem;
+  }
+  .cf-row-head {
+    padding: 0 1rem;
+  }
   .cf-row {
-    padding-left: 1rem;
-    padding-right: 1rem;
+    padding: 0.25rem 1rem 0.75rem;
+    gap: 0.5rem;
+  }
+  .cf-card {
+    width: 130px;
+  }
+  .cf-card-top {
+    width: 170px;
   }
   .cf-sidebar {
     grid-template-columns: 1fr;
@@ -325,5 +359,11 @@
   }
   .cf-footer {
     padding: 2rem 1rem 1rem;
+  }
+  .cf-modal-info {
+    padding: 1rem 1rem 1.5rem;
+  }
+  .cf-modal-title {
+    font-size: 1.5rem;
   }
 }

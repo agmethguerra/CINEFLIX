@@ -210,6 +210,9 @@ async function mostrarPantallaDeGenero(genero) {
   /* Inicializar el buscador con la función de búsqueda de la API */
   inicializarBuscador(buscarContenido);
 
+  /* Configurar el menú móvil */
+  inicializarMenuMovil();
+  
   /* Conectar los enlaces del navbar */
   ["navInicio", "navInicio2"].forEach((idElemento) => {
     document.getElementById(idElemento)?.addEventListener("click", (evento) => {
@@ -233,4 +236,100 @@ async function mostrarPantallaDeGenero(genero) {
 
   /* Renderizar la pantalla de inicio al arrancar */
   await mostrarPantallaInicio();
+
+  /* ── Menú móvil ── */
+  function inicializarMenuMovil() {
+    const botonAbrir =
+      document.getElementById("navToggle") ||
+      document.querySelector(".cf-nav-toggle");
+    const botonCerrar = document.getElementById("mobileClose");
+    const fondo = document.getElementById("mobileBackdrop");
+    const menu = document.getElementById("mobileMenu");
+    const botonCat = document.getElementById("mobileCatBtn");
+    const subMenu = document.getElementById("mobileSubmenu");
+    const flechaCat = document.getElementById("mobileCatArrow");
+    const inputMovil = document.getElementById("mobileSearchInput");
+
+    if (!menu) return;
+
+    function abrirMenu() {
+      menu.classList.add("is-open");
+      fondo.classList.add("is-open");
+      document.body.style.overflow = "hidden";
+    }
+
+    function cerrarMenu() {
+      menu.classList.remove("is-open");
+      fondo.classList.remove("is-open");
+      document.body.style.overflow = "";
+    }
+
+    botonAbrir?.addEventListener("click", abrirMenu);
+    botonCerrar?.addEventListener("click", cerrarMenu);
+    fondo?.addEventListener("click", cerrarMenu);
+
+    /* Toggle sub-menú de categorías */
+    botonCat?.addEventListener("click", () => {
+      subMenu.classList.toggle("is-open");
+      flechaCat.style.transform = subMenu.classList.contains("is-open")
+        ? "rotate(180deg)"
+        : "rotate(0deg)";
+    });
+
+    /* Poblar sub-menú con los géneros (se llama después de cargar géneros) */
+    window._poblarSubmenuMovil = function (listaDeGeneros, alSeleccionar) {
+      if (!subMenu) return;
+      subMenu.innerHTML = "";
+      listaDeGeneros.forEach((genero) => {
+        const enlace = document.createElement("a");
+        enlace.href = "#";
+        enlace.innerHTML = `<i class="bi bi-chevron-right"></i>${genero.name || genero}`;
+        enlace.addEventListener("click", (evento) => {
+          evento.preventDefault();
+          cerrarMenu();
+          alSeleccionar(genero);
+        });
+        subMenu.appendChild(enlace);
+      });
+    };
+    window._poblarSubmenuMovil?.(listaDeGeneros, mostrarPantallaDeGenero);
+    /* Links de navegación del menú móvil */
+    document.getElementById("mobileInicio")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      cerrarMenu();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      mostrarPantallaInicio();
+    });
+    document
+      .getElementById("mobilePeliculas")
+      ?.addEventListener("click", (e) => {
+        e.preventDefault();
+        cerrarMenu();
+        mostrarPantallaPeliculas();
+      });
+    document.getElementById("mobileSeries")?.addEventListener("click", (e) => {
+      e.preventDefault();
+      cerrarMenu();
+      mostrarPantallaSeries();
+    });
+
+    /* Buscador del menú móvil — reutiliza la misma lógica */
+    let debounceMovil = null;
+    inputMovil?.addEventListener("input", () => {
+      clearTimeout(debounceMovil);
+      const texto = inputMovil.value.trim();
+      if (texto.length < 2) return;
+      debounceMovil = setTimeout(async () => {
+        const resultados = await buscarContenido(texto);
+        if (resultados.length) {
+          cerrarMenu();
+          contenedorPrincipal.innerHTML = "";
+          contenedorPrincipal.appendChild(
+            crearSeccion(`Resultados: "${texto}"`, resultados),
+          );
+          inputMovil.value = "";
+        }
+      }, 380);
+    });
+  }
 })();

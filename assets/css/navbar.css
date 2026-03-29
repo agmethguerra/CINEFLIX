@@ -1,5 +1,5 @@
 /* =============================================
-   CINEFLIX — Navbar
+   CINESFLIX — Navbar
    ============================================= */
 .cf-nav {
   position: sticky;
@@ -25,6 +25,7 @@
   font-style: normal;
 }
 
+/* ── Links de escritorio ── */
 .cf-nav-links {
   display: flex;
   align-items: center;
@@ -69,7 +70,7 @@
   background: var(--c-crimson);
 }
 
-/* Dropdown */
+/* ── Dropdown escritorio ── */
 .cf-dropdown-menu {
   position: absolute;
   top: calc(100% + 1px);
@@ -121,7 +122,7 @@
   margin: 0.25rem 0;
 }
 
-/* Search */
+/* ── Buscador ── */
 .cf-search {
   flex: 1;
   max-width: 420px;
@@ -155,7 +156,6 @@
   color: var(--c-text-muted);
   font-size: 0.9rem;
   pointer-events: none;
-  transition: color var(--t-fast);
 }
 .cf-search input:focus ~ .cf-search-icon {
   color: var(--c-crimson);
@@ -204,14 +204,191 @@
   margin-top: 0.1rem;
 }
 
+/* ── Botón hamburguesa (oculto en escritorio) ── */
 .cf-nav-toggle {
   display: none;
   background: none;
   border: none;
   color: var(--c-text);
-  font-size: 1.3rem;
+  font-size: 1.4rem;
+  padding: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
+/* ════════════════════════════════════════
+   MENÚ MÓVIL — panel lateral deslizable
+   ════════════════════════════════════════ */
+.cf-mobile-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px;
+  height: 100dvh;
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  z-index: calc(var(--z-nav) + 10);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.28s ease;
+  overflow-y: auto;
+}
+.cf-mobile-menu.is-open {
+  transform: translateX(0);
+}
+
+/* Fondo oscuro detrás del menú */
+.cf-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: calc(var(--z-nav) + 9);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+.cf-mobile-backdrop.is-open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* Cabecera del menú móvil */
+.cf-mobile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+.cf-mobile-logo {
+  font-family: var(--f-display);
+  font-size: 1.5rem;
+  letter-spacing: 0.06em;
+  color: var(--c-white);
+}
+.cf-mobile-logo em {
+  color: var(--c-crimson);
+  font-style: normal;
+}
+.cf-mobile-close {
+  background: none;
+  border: none;
+  color: var(--c-text-muted);
+  font-size: 1.3rem;
+  transition: color var(--t-fast);
+}
+.cf-mobile-close:hover {
+  color: var(--c-white);
+}
+
+/* Links del menú móvil */
+.cf-mobile-links {
+  padding: 0.75rem 0;
+  flex-shrink: 0;
+}
+.cf-mobile-links a,
+.cf-mobile-links button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: var(--f-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--c-text-soft);
+  padding: 0.75rem 1.25rem;
+  transition:
+    color var(--t-fast),
+    background var(--t-fast);
+  text-align: left;
+}
+.cf-mobile-links a:hover,
+.cf-mobile-links button:hover {
+  color: var(--c-white);
+  background: var(--c-surface-2);
+}
+.cf-mobile-links a i,
+.cf-mobile-links button i {
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+}
+
+/* Separador */
+.cf-mobile-divider {
+  border: none;
+  border-top: 1px solid var(--c-border);
+  margin: 0.5rem 0;
+}
+
+/* Sub-menú de categorías en móvil */
+.cf-mobile-submenu {
+  background: var(--c-bg);
+  border-top: 1px solid var(--c-border);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.cf-mobile-submenu.is-open {
+  max-height: 600px;
+}
+.cf-mobile-submenu a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--f-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  padding: 0.6rem 1.5rem;
+  transition: color var(--t-fast);
+  border: none;
+  background: none;
+}
+.cf-mobile-submenu a:hover {
+  color: var(--c-crimson);
+}
+.cf-mobile-submenu a i {
+  color: var(--c-crimson);
+  font-size: 0.75rem;
+}
+
+/* Buscador dentro del menú móvil */
+.cf-mobile-search {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--c-border);
+  margin-top: auto;
+  flex-shrink: 0;
+}
+.cf-mobile-search input {
+  width: 100%;
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  color: var(--c-text);
+  font-family: var(--f-ui);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.85rem;
+  outline: none;
+  transition: border-color var(--t-fast);
+}
+.cf-mobile-search input::placeholder {
+  color: var(--c-text-muted);
+}
+.cf-mobile-search input:focus {
+  border-color: var(--c-crimson);
+}
+
+/* ════════════════════════════════════════
+   BREAKPOINTS
+   ════════════════════════════════════════ */
 @media (max-width: 900px) {
   .cf-nav-links {
     display: none;
@@ -221,15 +398,21 @@
     align-items: center;
   }
   .cf-search {
-    max-width: 240px;
+    max-width: 220px;
   }
 }
+
 @media (max-width: 540px) {
   .cf-nav {
     padding: 0 1rem;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
+  /* En móvil pequeño, el buscador del navbar se oculta
+     porque hay uno dentro del menú lateral */
   .cf-search {
-    max-width: 160px;
+    display: none;
+  }
+  .cf-nav-toggle {
+    margin-left: auto;
   }
 }
